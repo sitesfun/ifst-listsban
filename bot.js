@@ -1,220 +1,250 @@
 const TelegramBot = require('node-telegram-bot-api');
 const { initializeApp, cert } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
- 
+
 // ==============================
 //  КОНФІГУРАЦІЯ — заповни сюди
 // ==============================
 const BOT_TOKEN     = '8663329191:AAHGH2n94b75JQNKZqDrGrc_oK4nYO6KkCA';       // від @BotFather
 const MAIN_GROUP_ID = -1003808813847;          // ID основної групи
 const ADMIN_GROUP_ID = -5241972404;         // ID адмін групи (якщо є)
-const OWNER_USERNAME = 'rezm1t';               // нікнейм власника без @
- 
+const OWNER_USERNAME = 'rezm1t';
+
+const ADMIN_USERNAMES = [
+  'Innzyy', 'Freezy', 'Rezm1t', 'lidnik01',
+  'w1zen', 'illaG4', 'S3ruy', 'Zyx', 'Suslyk','Roaz'
+];
+
 // ==============================
-//  FIREBASE ADMIN INIT
+//  FIREBASE
 // ==============================
-const serviceAccount = {
-  projectId: process.env.FIREBASE_PROJECT_ID,
-  privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-  clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-}; // завантаж з Firebase Console
- 
+const serviceAccount = require('./serviceAccountKey.json');
 initializeApp({ credential: cert(serviceAccount) });
 const db = getFirestore();
- 
+
 // ==============================
-//  БОТ INIT
+//  БОТ
 // ==============================
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
- 
+
+// ==============================
+//  ПЕРЕВІРКИ РОЛЕЙ
+// ==============================
+function getUsername(msg) {
+  return msg.from?.username || null;
+}
+
+function isOwner(msg) {
+  return getUsername(msg) === OWNER_USERNAME;
+}
+
+function isAdmin(msg) {
+  const u = getUsername(msg);
+  return u && ADMIN_USERNAMES.includes(u);
+}
+
+// Middleware — тихо ігнорує якщо не адмін
+// Повертає true якщо доступ дозволено, false якщо ні
+async function guardAdmin(msg) {
+  if (isAdmin(msg)) return true;
+  // не відповідаємо нічого — бот просто мовчить для сторонніх
+  return false;
+}
+
+// Middleware — тільки owner, з повідомленням для адмінів
+async function guardOwner(msg) {
+  if (!isAdmin(msg)) return false; // сторонні — мовчимо
+  if (isOwner(msg)) return true;
+  await bot.sendMessage(msg.chat.id, '🚫 Тільки власник може виконати цю команду.');
+  return false;
+}
+
 // ==============================
 //  ХЕЛПЕРИ
 // ==============================
-function isOwner(msg) {
-  return msg.from?.username === OWNER_USERNAME;
-}
- 
 function getMonthLabel() {
   return new Date().toLocaleString('uk-UA', { month: 'long', year: 'numeric' });
 }
- 
+
 function parseDate(dateStr) {
-  // формат: "05.04.2026, 12:00:00"
   if (!dateStr) return null;
   const parts = dateStr.split(/[., :/]/);
   return new Date(parts[2], parts[1] - 1, parts[0]);
 }
- 
+
 // ==============================
-//  КОМАНДА /start або /help
+//  /start  /help
 // ==============================
-bot.onText(/\/(start|help)/, (msg) => {
+bot.onText(/\/(start|help)/, async (msg) => {
+  if (!await guardAdmin(msg)) return;
   const chatId = msg.chat.id;
+
+  const isOw = isOwner(msg);
   bot.sendMessage(chatId,
 `🛹 *IFR Samokater Bot*
- 
+
 Доступні команди:
 /stats — статистика порушень
 /members — кількість людей у групах
-/sync — синхронізувати дані (тільки owner)
- 
-_Бот групи Ivano-Frankivsk Samokater Team_`,
-    { parse_mode: 'Markdown' }
+${isOw ? '/sync — синхронізувати дані\n/admins — список адмінів' : ''}
+
+_Ivano\\-Frankivsk Samokater Team_`,
+    { parse_mode: 'MarkdownV2' }
   );
 });
- 
+
 // ==============================
-//  КОМАНДА /stats
+//  /stats
 // ==============================
 bot.onText(/\/stats/, async (msg) => {
+  if (!await guardAdmin(msg)) return;
   const chatId = msg.chat.id;
- 
+
   try {
     const snap = await db.collection('violations').get();
     const now = new Date();
     const thisMonth = now.getMonth();
-    const thisYear = now.getFullYear();
- 
-    let total = 0, bans = 0, warns = 0;
-    let monthWarns = 0, monthBans = 0;
+    const thisYear  = now.getFullYear();
+
+    let total = 0, bans = 0, warns = 0, monthWarns = 0, monthBans = 0;
     const userWarns = {};
- 
+
     snap.forEach(doc => {
       const d = doc.data();
       total++;
- 
-      if (d.warns >= 4) bans++;
-      else warns++;
- 
-      // рахуємо за поточний місяць
+      if (d.warns >= 4) bans++; else warns++;
+
       const date = parseDate(d.date);
       if (date && date.getMonth() === thisMonth && date.getFullYear() === thisYear) {
-        if (d.warns >= 4) monthBans++;
-        else monthWarns++;
+        if (d.warns >= 4) monthBans++; else monthWarns++;
       }
- 
-      // топ порушників
-      if (!userWarns[d.name]) userWarns[d.name] = 0;
-      userWarns[d.name] += d.warns;
+
+      userWarns[d.name] = (userWarns[d.name] || 0) + d.warns;
     });
- 
-    // топ-3
+
     const top = Object.entries(userWarns)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 3)
-      .map(([name, w], i) => `${i + 1}. @${name} — ${w} ⚠️`)
+      .map(([name, w], i) => `${i + 1}\\. @${name} — ${w} ⚠️`)
       .join('\n');
- 
+
     bot.sendMessage(chatId,
 `📊 *Статистика порушень*
- 
-📅 *${getMonthLabel()}*
+
+📅 *${getMonthLabel().replace(/[-.]/g, '\\$&')}*
 ├ Попереджень: *${monthWarns}*
 └ Банів: *${monthBans}*
- 
+
 📋 *Загалом у базі*
 ├ Всього записів: *${total}*
 ├ Попереджень: *${warns}*
 └ Банів: *${bans}*
- 
+
 🏆 *Топ порушників*
 ${top || '— поки нікого'}`,
-      { parse_mode: 'Markdown' }
+      { parse_mode: 'MarkdownV2' }
     );
   } catch (e) {
     console.error(e);
     bot.sendMessage(chatId, '❌ Помилка при отриманні статистики.');
   }
 });
- 
+
 // ==============================
-//  КОМАНДА /members
+//  /members
 // ==============================
 bot.onText(/\/members/, async (msg) => {
+  if (!await guardAdmin(msg)) return;
   const chatId = msg.chat.id;
- 
+
   try {
     const [mainCount, adminCount] = await Promise.all([
       bot.getChatMemberCount(MAIN_GROUP_ID),
       bot.getChatMemberCount(ADMIN_GROUP_ID).catch(() => null),
     ]);
- 
-    let text = `👥 *Учасники груп*\n\n`;
-    text += `🛹 Основна група: *${mainCount}* осіб\n`;
-    if (adminCount !== null) {
-      text += `🔐 Адмін група: *${adminCount}* осіб\n`;
-    }
- 
-    // також записуємо в Firebase для owner panel
-    await db.collection('meta').doc('groupStats').set({
-      mainGroupCount: mainCount,
+
+    await db.collection('meta').doc('ownerPanel').set({
+      mainGroupCount:  mainCount,
       adminGroupCount: adminCount ?? 0,
       updatedAt: new Date().toISOString(),
-    });
- 
+    }, { merge: true });
+
+    let text = `👥 *Учасники груп*\n\n🛹 Основна група: *${mainCount}* осіб\n`;
+    if (adminCount !== null) text += `🔐 Адмін група: *${adminCount}* осіб`;
+
     bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
   } catch (e) {
     console.error(e);
-    bot.sendMessage(chatId, '❌ Не вдалось отримати кількість учасників. Переконайся що бот є адміном групи.');
+    bot.sendMessage(chatId, '❌ Не вдалось отримати кількість учасників.');
   }
 });
- 
+
 // ==============================
-//  КОМАНДА /sync (тільки owner)
+//  /sync  (тільки owner)
 // ==============================
 bot.onText(/\/sync/, async (msg) => {
+  if (!await guardOwner(msg)) return;
   const chatId = msg.chat.id;
- 
-  if (!isOwner(msg)) {
-    return bot.sendMessage(chatId, '🚫 Тільки власник може виконати синхронізацію.');
-  }
- 
+
   try {
     const [mainCount, adminCount] = await Promise.all([
       bot.getChatMemberCount(MAIN_GROUP_ID),
       bot.getChatMemberCount(ADMIN_GROUP_ID).catch(() => 0),
     ]);
- 
+
     const snap = await db.collection('violations').get();
     const now = new Date();
     const thisMonth = now.getMonth();
-    const thisYear = now.getFullYear();
- 
+    const thisYear  = now.getFullYear();
+
     let monthWarns = 0, monthBans = 0;
     snap.forEach(doc => {
       const d = doc.data();
       const date = parseDate(d.date);
       if (date && date.getMonth() === thisMonth && date.getFullYear() === thisYear) {
-        if (d.warns >= 4) monthBans++;
-        else monthWarns++;
+        if (d.warns >= 4) monthBans++; else monthWarns++;
       }
     });
- 
+
     await db.collection('meta').doc('ownerPanel').set({
-      mainGroupCount: mainCount,
-      adminGroupCount: adminCount,
-      monthWarns,
-      monthBans,
-      updatedAt: new Date().toISOString(),
+      mainGroupCount: mainCount, adminGroupCount: adminCount,
+      monthWarns, monthBans, updatedAt: new Date().toISOString(),
     });
- 
+
     bot.sendMessage(chatId,
-`✅ *Синхронізовано успішно!*
- 
+`✅ *Синхронізовано успішно\\!*
+
 👥 Основна група: *${mainCount}*
 🔐 Адмін група: *${adminCount}*
 ⚠️ Попереджень цього місяця: *${monthWarns}*
 🔨 Банів цього місяця: *${monthBans}*`,
-      { parse_mode: 'Markdown' }
+      { parse_mode: 'MarkdownV2' }
     );
   } catch (e) {
     console.error(e);
     bot.sendMessage(chatId, '❌ Помилка синхронізації: ' + e.message);
   }
 });
- 
+
 // ==============================
-//  АВТО-СИНХРОНІЗАЦІЯ кожну годину
+//  /admins  (тільки owner)
+// ==============================
+bot.onText(/\/admins/, async (msg) => {
+  if (!await guardOwner(msg)) return;
+  const chatId = msg.chat.id;
+
+  const list = ADMIN_USERNAMES
+    .map((u, i) => `${i === 0 ? '♛' : `${i}.`} @${u}${i === 0 ? ' \\(Owner\\)' : ''}`)
+    .join('\n');
+
+  bot.sendMessage(chatId,
+`👥 *Список адміністрації*\n\n${list}`,
+    { parse_mode: 'MarkdownV2' }
+  );
+});
+
+// ==============================
+//  АВТО-СИНХРОНІЗАЦІЯ щогодини
 // ==============================
 setInterval(async () => {
   try {
@@ -222,34 +252,38 @@ setInterval(async () => {
       bot.getChatMemberCount(MAIN_GROUP_ID),
       bot.getChatMemberCount(ADMIN_GROUP_ID).catch(() => 0),
     ]);
- 
+
     const snap = await db.collection('violations').get();
     const now = new Date();
-    const thisMonth = now.getMonth();
-    const thisYear = now.getFullYear();
- 
+    const thisMonth = now.getMonth(), thisYear = now.getFullYear();
     let monthWarns = 0, monthBans = 0;
+
     snap.forEach(doc => {
       const d = doc.data();
       const date = parseDate(d.date);
       if (date && date.getMonth() === thisMonth && date.getFullYear() === thisYear) {
-        if (d.warns >= 4) monthBans++;
-        else monthWarns++;
+        if (d.warns >= 4) monthBans++; else monthWarns++;
       }
     });
- 
+
     await db.collection('meta').doc('ownerPanel').set({
-      mainGroupCount: mainCount,
-      adminGroupCount: adminCount,
-      monthWarns,
-      monthBans,
-      updatedAt: new Date().toISOString(),
+      mainGroupCount: mainCount, adminGroupCount: adminCount,
+      monthWarns, monthBans, updatedAt: new Date().toISOString(),
     });
- 
+
     console.log(`[${new Date().toLocaleString()}] Авто-синхронізація OK`);
   } catch (e) {
     console.error('Авто-синхронізація помилка:', e.message);
   }
-}, 60 * 60 * 1000); // кожну годину
- 
+}, 60 * 60 * 1000);
+
+// ==============================
+//  ІГНОРУЄМО ВСІ ІНШІ ПОВІДОМЛЕННЯ
+//  від не-адмінів — бот просто мовчить
+// ==============================
+bot.on('message', (msg) => {
+  // цей обробник спрацьовує після всіх onText
+  // нічого не робимо — просто мовчимо для сторонніх
+});
+
 console.log('🤖 Samokater Bot запущено!');
