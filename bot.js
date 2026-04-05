@@ -13,7 +13,11 @@ const OWNER_USERNAME = 'innzyy';               // нікнейм власник�
 // ==============================
 //  FIREBASE ADMIN INIT
 // ==============================
-const serviceAccount = require('./serviceAccountKey.json'); // завантаж з Firebase Console
+const serviceAccount = {
+  projectId: process.env.FIREBASE_PROJECT_ID,
+  privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+  clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+}; // завантаж з Firebase Console
  
 initializeApp({ credential: cert(serviceAccount) });
 const db = getFirestore();
