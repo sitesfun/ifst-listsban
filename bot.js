@@ -12,13 +12,27 @@ const OWNER_USERNAME = 'rezm1t';
 
 const ADMIN_USERNAMES = [
   'Innzyy', 'Freezy', 'Rezm1t', 'lidnik01',
-  'w1zen', 'illaG4', 'S3ruy', 'Zyx', 'Suslyk','Roaz'
+  'w1zen', 'illaG4', 'S3ruy', 'Zyx', 'Suslyk', 'Roaz1'
 ];
 
 // ==============================
 //  FIREBASE
 // ==============================
-const serviceAccount = require('./serviceAccountKey.json');
+// Варіант 1 (хостинг): env змінна FIREBASE_SERVICE_ACCOUNT = весь JSON одним рядком
+// Варіант 2 (локально): файл serviceAccountKey.json поруч з bot.js
+let serviceAccount;
+if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+  serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+} else {
+  try {
+    serviceAccount = require('./serviceAccountKey.json');
+  } catch(e) {
+    console.error('❌ Firebase credentials не знайдено!\n' +
+      '  Хостинг: додай env змінну FIREBASE_SERVICE_ACCOUNT\n' +
+      '  Локально: поклади serviceAccountKey.json поруч з bot.js');
+    process.exit(1);
+  }
+}
 initializeApp({ credential: cert(serviceAccount) });
 const db = getFirestore();
 
