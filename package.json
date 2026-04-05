@@ -1,0 +1,13 @@
+{
+  "name": "samokater-bot",
+  "version": "1.0.0",
+  "description": "IFR Samokater Team Telegram Bot",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.7.0",
+    "node-telegram-bot-api": "^0.67.0"
+  }
+}
