@@ -22,7 +22,7 @@ const db   = getFirestore(app);
 const auth = getAuth(app);
 
 const OWNER  = 'innzyy';
-const ADMINS = ['Innzyy','Freezy','Rezm1t','lidnik01','w1zen','illaG4','S3ruy','Zyx','///','Suslyk'];
+const ADMINS = ['innzyy','Freezy','Rezm1t','lidnik01','w1zen','illaG4','S3ruy','Zyx','///','Suslyk'];
 
 let currentUser       = null;
 let unsubViolations   = null;
@@ -211,6 +211,7 @@ function setBar(id, val, max){
   if(f) f.style.width = Math.round(val/max*100)+'%';
   if(n) n.textContent = val;
 }
+
 </script>
 
 <style>
@@ -584,6 +585,5 @@ const revealObs = new IntersectionObserver(entries => {
   });
 }, { threshold: 0.08 });
 </script>
-<script src="bot.js"></script>
 </body>
 </html>
