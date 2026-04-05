@@ -8,7 +8,7 @@ const { getFirestore } = require('firebase-admin/firestore');
 const BOT_TOKEN     = '8663329191:AAHGH2n94b75JQNKZqDrGrc_oK4nYO6KkCA';       // від @BotFather
 const MAIN_GROUP_ID = -1003808813847;          // ID основної групи
 const ADMIN_GROUP_ID = -5241972404;         // ID адмін групи (якщо є)
-const OWNER_USERNAME = 'innzyy';               // нікнейм власника без @
+const OWNER_USERNAME = 'rezm1t';               // нікнейм власника без @
  
 // ==============================
 //  FIREBASE ADMIN INIT
