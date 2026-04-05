@@ -5,14 +5,14 @@ const { getFirestore } = require('firebase-admin/firestore');
 // ==============================
 //  КОНФІГУРАЦІЯ — заповни сюди
 // ==============================
-const BOT_TOKEN     = '8663329191:AAHGH2n94b75JQNKZqDrGrc_oK4nYO6KkCA';       // від @BotFather
+const BOT_TOKEN      = process.env.BOT_TOKEN || '8663329191:AAHGH2n94b75JQNKZqDrGrc_oK4nYO6KkCA';
 const MAIN_GROUP_ID = -1003808813847;          // ID основної групи
 const ADMIN_GROUP_ID = -5241972404;         // ID адмін групи (якщо є)
-const OWNER_USERNAME = 'rezm1t';
+const OWNER_USERNAME = 'rezm1t'; 
 
 const ADMIN_USERNAMES = [
   'Innzyy', 'Freezy', 'Rezm1t', 'lidnik01',
-  'w1zen', 'illaG4', 'S3ruy', 'Zyx', 'Suslyk', 'Roaz1'
+  'w1zen', 'illaG4', 'S3ruy', 'Zyx', 'Suslyk', 'Ro1az'
 ];
 
 // ==============================
